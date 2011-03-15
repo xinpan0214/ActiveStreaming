@@ -1,4 +1,4 @@
-package netserv.apps.activestreaming.server;
+package netserv.apps.activestreaming.module;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -8,14 +8,17 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.URL;
 
+import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+
+import netserv.apps.activestreaming.server.ContentServer;
 
 import org.mortbay.jetty.Server;
 import org.mortbay.jetty.servlet.Context;
 import org.mortbay.jetty.servlet.ServletHolder;
 
-public class NetServStreamingNode {
+public class NetServNode extends HttpServlet {
 	private static final int BUF_SIZE = 1024;
 
 	public void doPost(HttpServletRequest request, HttpServletResponse response) {
@@ -62,7 +65,6 @@ public class NetServStreamingNode {
 		long start, duration = 0;
 
 		start = System.currentTimeMillis();
-
 		try {
 
 			String filename = url.substring(url.lastIndexOf('/') + 1,
@@ -110,7 +112,6 @@ public class NetServStreamingNode {
 			// System.err.printf("%d: wrote %d bytes\n", ++i, count);
 			total += count;
 		}
-
 		in.close();
 		out.close();
 
@@ -130,8 +131,7 @@ public class NetServStreamingNode {
 		// starting jetty server
 		Server server = new Server(8888);
 		Context root = new Context(server, "/", Context.SESSIONS);
-		root.addServlet(new ServletHolder(new ContentServer()),
-				"/stream-cdn/*");
+		root.addServlet(new ServletHolder(new NetServNode()), "/stream-cdn/*");
 		System.out.println("NetServ node started..");
 		try {
 			server.start();
@@ -140,6 +140,5 @@ public class NetServStreamingNode {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-
 	}
 }

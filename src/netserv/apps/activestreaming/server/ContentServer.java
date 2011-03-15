@@ -45,7 +45,7 @@ public class ContentServer extends HttpServlet {
 		}
 
 		String url = null;
-		if (mode.equalsIgnoreCase("direct")) {
+		if (mode != null && mode.equalsIgnoreCase("direct")) {
 			url = this.directURL(file);
 		} else {
 			url = this.netservNodeURL(file);
