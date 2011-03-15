@@ -11,10 +11,11 @@ import uk.co.caprica.vlcj.player.headless.HeadlessMediaPlayer;
 
 class Streamer {
 	private static HeadlessMediaPlayer mediaPlayer = null;
-	private static String serverAddress;
+	private static String serverAddress = "127.0.1.1";
 	private static String serverPort = "5555";
 	public static Set<String> Files = new HashSet<String>();
 	public static final Streamer PLAYER;
+	public static String streamServer = serverAddress + ":"+serverPort;
 	
 	static {
 		PLAYER = new Streamer();
