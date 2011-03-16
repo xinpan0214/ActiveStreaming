@@ -21,7 +21,7 @@ import org.mortbay.jetty.servlet.Context;
 import org.mortbay.jetty.servlet.ServletHolder;
 
 public class NetServNode extends HttpServlet {
-	
+
 	private static final long serialVersionUID = 1L;
 	ActiveStreamMap singleton = ActiveStreamMap.getInstance();
 	private static final int BUF_SIZE = 1024;
@@ -69,7 +69,7 @@ public class NetServNode extends HttpServlet {
 
 	/**
 	 * 
-	 * @param url 
+	 * @param url
 	 * @param cacheFile
 	 * @param response
 	 * @param saveStream
@@ -83,14 +83,12 @@ public class NetServNode extends HttpServlet {
 		OutputStream out = null;
 		OutputStream out_file = null;
 		long start, duration = 0;
+		CacheVideo cv = singleton.getVideo(url);
 
 		start = System.currentTimeMillis();
 		try {
 
 			String filename = cacheFile.getName();
-			String mimeType = "application/x-mpegURL";
-			// Set content type
-			response.setContentType(mimeType);
 			response.setHeader("Content-Disposition", "inline; filename="
 					+ filename);
 			response.setHeader("Cache-Control", "no-cache");
@@ -99,13 +97,19 @@ public class NetServNode extends HttpServlet {
 			// Copy the contents of the file to the output stream
 			byte[] buf = new byte[BUF_SIZE];
 			int count = 0;
-			CacheVideo cv = singleton.getVideo(url);
+			/**
+			 * All the streaming logic is below, we need to make
+			 * this as solid as possible.
+			 * @aditya - look at File Channels
+			 */
 			// first time
 			if (saveStream) {
+				Util.print("Serving the url stream & saving in local cache");
 				URL urlstream = new URL(url);
 				in = urlstream.openStream();
-				out_file = new FileOutputStream(cacheFile,true);
+				out_file = new FileOutputStream(cacheFile, true);
 			} else {
+				Util.print("Serving from local cache");
 				in = new FileInputStream(cacheFile);
 				// pointing to the current position
 				in.skip(cv.getTotalByteSaved());
@@ -120,16 +124,22 @@ public class NetServNode extends HttpServlet {
 			}
 		} catch (org.mortbay.jetty.EofException e) {
 			Util.error("Jetty.EOF : Browser connection closed !");
-		} catch (Exception e) {
-			Util.error("While writing to browser's stream");
-			e.toString();
+		} 
+		
+		try {
+			if (in != null)
+				in.close();
+			if (out != null)
+				out.close();
+			if (out_file != null) {
+				out_file.close();
+				duration = System.currentTimeMillis() - start;
+				cv.setState(CacheVideo.VOD);
+			}
+		} catch (IOException e) {
+			Util.print("Error closing IO streams (" + e.toString() + ")");
 		}
-		in.close();
-		out.close();
-		if (out_file != null) {
-			out_file.close();
-			duration = System.currentTimeMillis() - start;
-		}
+		
 		System.out.println("Total served duration:" + duration);
 	}
 

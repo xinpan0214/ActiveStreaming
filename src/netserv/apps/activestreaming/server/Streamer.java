@@ -53,7 +53,7 @@ class Streamer {
 
 	private static String formatHttpStream(String file) {
 		StringBuilder sb = new StringBuilder(60);
-		sb.append(":sout=#standard{access=http,mux=ts,");
+		sb.append(":sout=#standard{access=http,mux=asf,");
 		sb.append("dst=");
 		sb.append(serverAddress);
 		sb.append(':');

@@ -51,20 +51,15 @@ public class ContentServer extends HttpServlet {
 			url = this.netservNodeURL(file);
 		}
 
-		if (file != null && Streamer.Files.contains(file.trim())) {
+		//if (file != null && Streamer.Files.contains(file.trim())) {
 			// file is streaming
 			System.out.println("Found file in the directory !");
-			// send a redirect to netserv node
-			try {
-				response.sendRedirect(url);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		} else {
+			// response.sendRedirect(url);
+			sendHTML(url, file, response);
+		//} else {
 			// no file found
-			System.out.println("file is not present !!");
-		}
+			//System.out.println("file is not present !!");
+		//}
 	}
 
 	public void sendHTML(String url, String file, HttpServletResponse response) {
@@ -114,13 +109,13 @@ public class ContentServer extends HttpServlet {
 		} catch (UnsupportedEncodingException e) {
 			e.printStackTrace();
 		}
+		newurl = "http://192.168.15.4:8080/";
 		return newurl;
 	}
 
 	public static void main(String[] args) throws Exception {
 		// starting streaming service
-		Streamer.playMedia(
-				"/home/aman/workspace/ActiveStreaming/samples/Hop.avi", "hop");
+		//Streamer.playMedia("/home/aman/workspace/ActiveStreaming/samples/Hop.avi", "hop");
 
 		// starting jetty server
 		Server server = new Server(8080);
