@@ -54,30 +54,39 @@ public class ContentServer extends HttpServlet {
 		if (file != null && Streamer.Files.contains(file.trim())) {
 			// file is streaming
 			System.out.println("Found file in the directory !");
+			// send a redirect to netserv node
 			try {
-				PrintWriter pr = response.getWriter();
-				pr.write("<html>");
-				pr.write("<head><title>NetServ Active Streaming</title></head>");
-				pr.write("<body>");
-				pr.write("<h1>NetServ Active Streaming</h1>");
-
-				pr.write("<embed type=\"application/x-vlc-plugin\" name="
-						+ file
-						+ " autoplay=\"yes\" loop=\"no\" width=\"1280\" height=\"500\" target=\""
-						+ url + "\"" + " />");
-				pr.write("<br />");
-
-				pr.write("</body>");
-				pr.write("</html>");
-				pr.flush();
-			} catch (IOException e1) {
+				response.sendRedirect(url);
+			} catch (IOException e) {
 				// TODO Auto-generated catch block
-				e1.printStackTrace();
+				e.printStackTrace();
 			}
-
 		} else {
 			// no file found
 			System.out.println("file is not present !!");
+		}
+	}
+
+	public void sendHTML(String url, String file, HttpServletResponse response) {
+		try {
+			PrintWriter pr = response.getWriter();
+			pr.write("<html>");
+			pr.write("<head><title>NetServ Active Streaming</title></head>");
+			pr.write("<body>");
+			pr.write("<h1>NetServ Active Streaming</h1>");
+
+			pr.write("<embed type=\"application/x-vlc-plugin\" name="
+					+ file
+					+ " autoplay=\"yes\" loop=\"no\" width=\"1280\" height=\"500\" target=\""
+					+ url + "\"" + " />");
+			pr.write("<br />");
+
+			pr.write("</body>");
+			pr.write("</html>");
+			pr.flush();
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
 		}
 	}
 
@@ -93,7 +102,7 @@ public class ContentServer extends HttpServlet {
 	public String netservNodeURL(String file) {
 		String netserv = "127.0.1.1:8888";
 		String newurl = "";
-		newurl = "http://" + netserv + "/stream-cdn/?url="+directURL(file);
+		newurl = "http://" + netserv + "/stream-cdn/?url=" + directURL(file);
 		return newurl;
 	}
 

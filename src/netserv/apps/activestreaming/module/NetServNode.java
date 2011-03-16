@@ -1,6 +1,8 @@
 package netserv.apps.activestreaming.module;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,109 +14,118 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import netserv.apps.activestreaming.server.ContentServer;
+import netserv.apps.activestreaming.module.ActiveStreamMap.CacheVideo;
 
 import org.mortbay.jetty.Server;
 import org.mortbay.jetty.servlet.Context;
 import org.mortbay.jetty.servlet.ServletHolder;
 
 public class NetServNode extends HttpServlet {
+	
+	private static final long serialVersionUID = 1L;
+	ActiveStreamMap singleton = ActiveStreamMap.getInstance();
 	private static final int BUF_SIZE = 1024;
 
 	public void doPost(HttpServletRequest request, HttpServletResponse response) {
 		this.doGet(request, response);
 	}
 
+	/**
+	 * Because Jetty servlet ThreadPool, each request is processed in a
+	 * different thread
+	 */
 	public void doGet(HttpServletRequest request, HttpServletResponse response) {
-		String url = request.getParameter("url");
-		final String client = request.getRemoteAddr();
-		System.out.println("NetServ Node : Get request !");
+		final String url = request.getParameter("url");
 
-		/**
-		 * Check whether url file is present or not ? if present generate html
-		 * with two links else return the save and send stream
-		 */
-		// For live Stream
-		if (url == null) {
-			try {
-				response.getWriter().write("It Works !!");
-			} catch (IOException e2) {
-				// TODO Auto-generated catch block
-				e2.printStackTrace();
-			}
-		}
-		// Stream it from cache
-		// final CacheVideo c = new CacheVideo (url);
-		// final String localStr = c.getFileForURL();
-		// File local = new File (localStr);
-		// this.serveAndSaveURL(url, response, local);
+		if (url == null)
+			return;
+
+		CacheVideo cache = singleton.addURL(url);
+		File cacheFile = cache.getFileForURL();
+
+		System.out.println();
+		Util.print("Request for " + url + " received from "
+				+ request.getRemoteAddr());
+
 		try {
-			this.serveAndSaveURL(url, response);
+			if (singleton.getState(url) == CacheVideo.INITIAL) {
+				Util.print("Setting up a new stream");
+				cache.setState(CacheVideo.LIVE);
+				this.serveURL(url, cacheFile, response, true);
+			} else if (singleton.getState(url) == CacheVideo.LIVE) {
+				// Live Broadcast is happening, add the client to list
+				Util.print("adding new client into the live broadcast list");
+				this.serveURL(url, cacheFile, response, false);
+			} else if (singleton.getState(url) == CacheVideo.VOD) {
+				// Live Broadcast has finished .. serve the recording
+				Util.print("Local cache: sending " + cacheFile.getName());
+				serveFromInputStream(cacheFile, response);
+			}
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
+			Util.error("Cannot save and send :(");
 			e.printStackTrace();
 		}
 	}
 
-	public void serveAndSaveURL(String url, HttpServletResponse response,
-			File... cache) throws IOException {
+	/**
+	 * 
+	 * @param url 
+	 * @param cacheFile
+	 * @param response
+	 * @param saveStream
+	 * @throws IOException
+	 */
+
+	public void serveURL(String url, File cacheFile,
+			HttpServletResponse response, boolean saveStream)
+			throws IOException {
 		InputStream in = null;
 		OutputStream out = null;
 		OutputStream out_file = null;
-		boolean writeToFile = false;
 		long start, duration = 0;
 
 		start = System.currentTimeMillis();
 		try {
 
-			String filename = url.substring(url.lastIndexOf('/') + 1,
-					url.length());
+			String filename = cacheFile.getName();
+			String mimeType = "application/x-mpegURL";
+			// Set content type
+			response.setContentType(mimeType);
 			response.setHeader("Content-Disposition", "inline; filename="
 					+ filename);
 			response.setHeader("Cache-Control", "no-cache");
 			response.setHeader("Expires", "-1");
 
-			// Open URL and read it in
-			URL urlstream = new URL(url);
-			in = urlstream.openStream();
+			// Copy the contents of the file to the output stream
+			byte[] buf = new byte[BUF_SIZE];
+			int count = 0;
+			CacheVideo cv = singleton.getVideo(url);
+			// first time
+			if (saveStream) {
+				URL urlstream = new URL(url);
+				in = urlstream.openStream();
+				out_file = new FileOutputStream(cacheFile,true);
+			} else {
+				in = new FileInputStream(cacheFile);
+				// pointing to the current position
+				in.skip(cv.getTotalByteSaved());
+			}
 			out = response.getOutputStream();
-			if (writeToFile && cache.length > 0)
-				out_file = new FileOutputStream(cache[0]);
-		} catch (org.mortbay.jetty.EofException e) {
-			// Nothing we can do about this exception.
-			// Browser closed the connection and Jetty reports EOF.
-		} catch (Exception e) {
-			String out1 = "While writing to browser's stream. (";
-			out1 += e.toString();
-			out1 += ")";
-		}
-
-		// Copy the contents of the file to the output stream
-		byte[] buf = new byte[BUF_SIZE];
-		int count = 0;
-		int total = 0;
-		System.out.println("Starting serving new client");
-		while ((count = in.read(buf)) > 0) {
-			try {
+			while ((count = in.read(buf)) > 0) {
 				out.write(buf, 0, count);
-			} catch (Exception e) {
-				String out1 = "While writing to browser's stream. (";
-				out1 += e.toString();
-				out1 += ")";
-
-			}
-			try {
-				if (writeToFile)
+				if (saveStream) {
 					out_file.write(buf, 0, count);
-			} catch (Exception e) {
-
+					cv.incrementTotalBytes(count);
+				}
 			}
-			// System.err.printf("%d: wrote %d bytes\n", ++i, count);
-			total += count;
+		} catch (org.mortbay.jetty.EofException e) {
+			Util.error("Jetty.EOF : Browser connection closed !");
+		} catch (Exception e) {
+			Util.error("While writing to browser's stream");
+			e.toString();
 		}
 		in.close();
 		out.close();
-
 		if (out_file != null) {
 			out_file.close();
 			duration = System.currentTimeMillis() - start;
@@ -123,12 +134,54 @@ public class NetServNode extends HttpServlet {
 	}
 
 	/**
+	 * Serves the stream from local repository
+	 * 
+	 * @param localFile
+	 * @param response
+	 */
+	public void serveFromInputStream(File localFile,
+			HttpServletResponse response) {
+		try {
+			FileInputStream in = new FileInputStream(localFile);
+			// Get the MIME type of the image
+			String mimeType = "video/mp4";
+
+			// Set content type
+			response.setContentType(mimeType);
+			response.setHeader("Content-Disposition", "inline; filename="
+					+ localFile.getName());
+			response.setHeader("Cache-Control", "no-cache");
+			response.setHeader("Expires", "-1");
+			// Set content size
+			response.setContentLength((int) localFile.length());
+
+			// Open the file and output streams
+			OutputStream out = response.getOutputStream();
+
+			// Copy the contents of the file to the output stream
+			byte[] buf = new byte[BUF_SIZE];
+			int count = 0;
+			while ((count = in.read(buf)) >= 0) {
+				out.write(buf, 0, count);
+			}
+			in.close();
+			out.flush();
+			out.close();
+		} catch (org.mortbay.jetty.EofException e) {
+			Util.error("Jetty.EOF : Browser connection closed !");
+		} catch (Exception e) {
+			String out = "While writing to browser's stream. (";
+			out += e.toString();
+			out += ")";
+			Util.print(out);
+		}
+	}
+
+	/**
 	 * This is the netserv node !! We need to save the stream from the server
 	 * and pass it to connected client.
 	 */
 	public static void main(String[] args) {
-		// TODO Auto-generated method stub
-		// starting jetty server
 		Server server = new Server(8888);
 		Context root = new Context(server, "/", Context.SESSIONS);
 		root.addServlet(new ServletHolder(new NetServNode()), "/stream-cdn/*");
@@ -137,7 +190,6 @@ public class NetServNode extends HttpServlet {
 			server.start();
 			server.join();
 		} catch (Exception e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
