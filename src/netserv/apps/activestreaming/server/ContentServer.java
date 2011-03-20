@@ -62,6 +62,7 @@ public class ContentServer extends HttpServlet {
 		//}
 	}
 
+	
 	public void sendHTML(String url, String file, HttpServletResponse response) {
 		try {
 			PrintWriter pr = response.getWriter();
@@ -72,7 +73,7 @@ public class ContentServer extends HttpServlet {
 
 			pr.write("<embed type=\"application/x-vlc-plugin\" name="
 					+ file
-					+ " autoplay=\"yes\" loop=\"no\" width=\"1280\" height=\"500\" target=\""
+					+ " autoplay=\"yes\" loop=\"no\" width=\"720\" height=\"480\" target=\""
 					+ url + "\"" + " />");
 			pr.write("<br />");
 
@@ -95,12 +96,19 @@ public class ContentServer extends HttpServlet {
 	 * @param response
 	 */
 	public String netservNodeURL(String file) {
-		String netserv = "127.0.1.1:8888";
+		String netserv = "128.59.13.123:8888";
 		String newurl = "";
 		newurl = "http://" + netserv + "/stream-cdn/?url=" + directURL(file);
 		return newurl;
 	}
 
+	public String netservNodeURL_VOD(String file) {
+		String netserv = "128.59.13.123:8888";
+		String newurl = "";
+		newurl = "http://" + netserv + "/stream-cdn/?url=" + directURL(file)+"&mode=vod";
+		return newurl;
+	}
+	
 	public String directURL(String file) {
 		String newurl = "";
 		try {
@@ -109,12 +117,13 @@ public class ContentServer extends HttpServlet {
 		} catch (UnsupportedEncodingException e) {
 			e.printStackTrace();
 		}
+		newurl = "http://128.59.13.140:8080";
 		return newurl;
 	}
 
 	public static void main(String[] args) throws Exception {
 		// starting streaming service
-		Streamer.playMedia("/home/raptor/Java/workspace/ActiveStreaming/samples/ken.mp4", "ken");
+		//Streamer.playMedia("/home/aman/workspace/ActiveStreaming/samples/smurfs.mp4", "smurfs");
 
 		// starting jetty server
 		Server server = new Server(8080);

@@ -1,6 +1,7 @@
 package netserv.apps.activestreaming.module;
 
 import java.io.File;
+import java.io.InputStream;
 import java.net.URL;
 import java.util.Collections;
 import java.util.HashMap;
@@ -75,6 +76,7 @@ public class ActiveStreamMap {
 		public static final int LIVE = 2;
 		public static final int VOD = 3;
 		public static final String LOCALROOT = "./cached-video";
+		public InputStream originInputStream;
 		public Set<HttpServletResponse> connectedClients = new HashSet<HttpServletResponse>();
 
 		private URL videourl = null;

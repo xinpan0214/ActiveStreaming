@@ -53,12 +53,12 @@ public class NetServNode extends HttpServlet {
 				Util.print("Setting up a new stream");
 				cacheVideo.setState(CacheVideo.LIVE);
 				cacheVideo.connectedClients.add(response);
-				this.serveURL(url, cacheFile, true);
+				this.serveURL(url, cacheFile, response, true);
 			} else if (singleton.getState(url) == CacheVideo.LIVE) {
 				// Live Broadcast is happening, add the client to list
 				Util.print("adding new client into the live broadcast list..");
 				cacheVideo.connectedClients.add(response);
-				this.serveURL(url, cacheFile, false);
+				this.serveURL(url, cacheFile, response, false);
 			} else if (singleton.getState(url) == CacheVideo.LIVE
 					&& (mode != null) && mode.equalsIgnoreCase("vod")) {
 				Util.print("Live streaming still happening.. but serving missed content "
@@ -83,8 +83,8 @@ public class NetServNode extends HttpServlet {
 	 * @throws IOException
 	 */
 
-	public void serveURL(String url, File cacheFile, boolean saveStream)
-			throws IOException {
+	public void serveURL(String url, File cacheFile, HttpServletResponse res,
+			boolean saveStream) throws IOException {
 		InputStream in = null;
 		OutputStream out_file = null;
 		long start, duration = 0;
@@ -94,6 +94,9 @@ public class NetServNode extends HttpServlet {
 		try {
 
 			String filename = cacheFile.getName();
+			res.setHeader("Content-Disposition", "inline; filename=" + filename);
+			res.setHeader("Cache-Control", "no-cache");
+			res.setHeader("Expires", "-1");
 
 			// Copy the contents of the file to the output stream
 			byte[] buf = new byte[BUF_SIZE];
@@ -101,27 +104,19 @@ public class NetServNode extends HttpServlet {
 			/**
 			 * All the streaming logic is below, we need to make this as solid
 			 * as possible.
-			 * 
-			 * @aditya - look at File Channels
 			 */
 			// first time
 			if (saveStream) {
 				Util.print("Serving the url stream & saving in local cache");
 				URL urlstream = new URL(url);
-				in = urlstream.openStream();
+				cv.originInputStream = urlstream.openStream();
 				out_file = new FileOutputStream(cacheFile);
 			}
-			for (HttpServletResponse res : cv.connectedClients) {
-				res.setHeader("Content-Disposition", "inline; filename="
-						+ filename);
-				res.setHeader("Cache-Control", "no-cache");
-				res.setHeader("Expires", "-1");
-			}
 
-			while ((count = in.read(buf)) > 0) {
+			while ((count = cv.originInputStream.read(buf)) > 0) {
 
-				for (HttpServletResponse res : cv.connectedClients) {
-					res.getOutputStream().write(buf, 0, count);
+				for (HttpServletResponse r : cv.connectedClients) {
+					r.getOutputStream().write(buf, 0, count);
 				}
 
 				if (saveStream) {
@@ -136,10 +131,10 @@ public class NetServNode extends HttpServlet {
 		try {
 			if (in != null)
 				in.close();
-			for (HttpServletResponse res : cv.connectedClients) {
-				if (res.getOutputStream() != null) {
-					res.getOutputStream().flush();
-					res.getOutputStream().close();
+			for (HttpServletResponse r : cv.connectedClients) {
+				if (r.getOutputStream() != null) {
+					r.getOutputStream().flush();
+					r.getOutputStream().close();
 				}
 
 			}
