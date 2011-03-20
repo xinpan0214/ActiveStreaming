@@ -5,6 +5,10 @@ import java.net.URL;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
+
+import javax.servlet.http.HttpServletResponse;
 
 /**
  * TODO: Serialization of this object !
@@ -71,6 +75,7 @@ public class ActiveStreamMap {
 		public static final int LIVE = 2;
 		public static final int VOD = 3;
 		public static final String LOCALROOT = "./cached-video";
+		public Set<HttpServletResponse> connectedClients = new HashSet<HttpServletResponse>();
 
 		private URL videourl = null;
 		private int currentFilePointer = 0;

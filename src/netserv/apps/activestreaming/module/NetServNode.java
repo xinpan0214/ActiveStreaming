@@ -36,12 +36,13 @@ public class NetServNode extends HttpServlet {
 	 */
 	public void doGet(HttpServletRequest request, HttpServletResponse response) {
 		final String url = request.getParameter("url");
+		final String mode = request.getParameter("mode"); // live or vod
 
 		if (url == null)
 			return;
 
-		CacheVideo cache = singleton.addURL(url);
-		File cacheFile = cache.getFileForURL();
+		CacheVideo cacheVideo = singleton.addURL(url);
+		File cacheFile = cacheVideo.getFileForURL();
 
 		System.out.println();
 		Util.print("Request for " + url + " received from "
@@ -50,12 +51,19 @@ public class NetServNode extends HttpServlet {
 		try {
 			if (singleton.getState(url) == CacheVideo.INITIAL) {
 				Util.print("Setting up a new stream");
-				cache.setState(CacheVideo.LIVE);
-				this.serveURL(url, cacheFile, response, true);
+				cacheVideo.setState(CacheVideo.LIVE);
+				cacheVideo.connectedClients.add(response);
+				this.serveURL(url, cacheFile, true);
 			} else if (singleton.getState(url) == CacheVideo.LIVE) {
 				// Live Broadcast is happening, add the client to list
-				Util.print("adding new client into the live broadcast list");
-				this.serveURL(url, cacheFile, response, false);
+				Util.print("adding new client into the live broadcast list..");
+				cacheVideo.connectedClients.add(response);
+				this.serveURL(url, cacheFile, false);
+			} else if (singleton.getState(url) == CacheVideo.LIVE
+					&& (mode != null) && mode.equalsIgnoreCase("vod")) {
+				Util.print("Live streaming still happening.. but serving missed content "
+						+ cacheFile.getName());
+				serveFromInputStream(cacheFile, response);
 			} else if (singleton.getState(url) == CacheVideo.VOD) {
 				// Live Broadcast has finished .. serve the recording
 				Util.print("Local cache: sending " + cacheFile.getName());
@@ -71,13 +79,11 @@ public class NetServNode extends HttpServlet {
 	 * 
 	 * @param url
 	 * @param cacheFile
-	 * @param response
 	 * @param saveStream
 	 * @throws IOException
 	 */
 
-	public void serveURL(String url, File cacheFile,
-			HttpServletResponse response, boolean saveStream)
+	public void serveURL(String url, File cacheFile, boolean saveStream)
 			throws IOException {
 		InputStream in = null;
 		OutputStream out = null;
@@ -89,18 +95,14 @@ public class NetServNode extends HttpServlet {
 		try {
 
 			String filename = cacheFile.getName();
-			
-			response.setHeader("Content-Disposition", "inline; filename="
-					+ filename);
-			response.setHeader("Cache-Control", "no-cache");
-			response.setHeader("Expires", "-1");
 
 			// Copy the contents of the file to the output stream
 			byte[] buf = new byte[BUF_SIZE];
 			int count = 0;
 			/**
-			 * All the streaming logic is below, we need to make
-			 * this as solid as possible.
+			 * All the streaming logic is below, we need to make this as solid
+			 * as possible.
+			 * 
 			 * @aditya - look at File Channels
 			 */
 			// first time
@@ -109,15 +111,20 @@ public class NetServNode extends HttpServlet {
 				URL urlstream = new URL(url);
 				in = urlstream.openStream();
 				out_file = new FileOutputStream(cacheFile);
-			} else {
-				Util.print("Serving from local cache");
-				in = new FileInputStream(cacheFile);
-				// pointing to the current position
-				in.skip(cv.getTotalByteSaved());
 			}
-			out = response.getOutputStream();
+			for (HttpServletResponse res : cv.connectedClients) {
+				res.setHeader("Content-Disposition", "inline; filename="
+						+ filename);
+				res.setHeader("Cache-Control", "no-cache");
+				res.setHeader("Expires", "-1");
+			}
+
 			while ((count = in.read(buf)) > 0) {
-				out.write(buf, 0, count);
+
+				for (HttpServletResponse res : cv.connectedClients) {
+					res.getOutputStream().write(buf, 0, count);
+				}
+
 				if (saveStream) {
 					out_file.write(buf, 0, count);
 					cv.incrementTotalBytes(count);
@@ -125,8 +132,8 @@ public class NetServNode extends HttpServlet {
 			}
 		} catch (org.mortbay.jetty.EofException e) {
 			Util.error("Jetty.EOF : Browser connection closed !");
-		} 
-		
+		}
+
 		try {
 			if (in != null)
 				in.close();
@@ -140,7 +147,7 @@ public class NetServNode extends HttpServlet {
 		} catch (IOException e) {
 			Util.print("Error closing IO streams (" + e.toString() + ")");
 		}
-		
+
 		System.out.println("Total served duration:" + duration);
 	}
 
