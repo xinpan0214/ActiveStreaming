@@ -86,7 +86,6 @@ public class NetServNode extends HttpServlet {
 	public void serveURL(String url, File cacheFile, boolean saveStream)
 			throws IOException {
 		InputStream in = null;
-		OutputStream out = null;
 		OutputStream out_file = null;
 		long start, duration = 0;
 		CacheVideo cv = singleton.getVideo(url);
@@ -137,8 +136,13 @@ public class NetServNode extends HttpServlet {
 		try {
 			if (in != null)
 				in.close();
-			if (out != null)
-				out.close();
+			for (HttpServletResponse res : cv.connectedClients) {
+				if (res.getOutputStream() != null) {
+					res.getOutputStream().flush();
+					res.getOutputStream().close();
+				}
+
+			}
 			if (out_file != null) {
 				out_file.close();
 				duration = System.currentTimeMillis() - start;
