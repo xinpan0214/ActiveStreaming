@@ -54,7 +54,7 @@ public class ContentServer extends HttpServlet {
 		//if (file != null && Streamer.Files.contains(file.trim())) {
 			// file is streaming
 			System.out.println("Found file in the directory !");
-			// response.sendRedirect(url);
+			//response.sendRedirect(url);
 			sendHTML(url, file, response);
 		//} else {
 			// no file found
@@ -109,13 +109,12 @@ public class ContentServer extends HttpServlet {
 		} catch (UnsupportedEncodingException e) {
 			e.printStackTrace();
 		}
-		newurl = "http://192.168.15.4:8080/";
 		return newurl;
 	}
 
 	public static void main(String[] args) throws Exception {
 		// starting streaming service
-		//Streamer.playMedia("/home/aman/workspace/ActiveStreaming/samples/Hop.avi", "hop");
+		Streamer.playMedia("/home/raptor/Java/workspace/ActiveStreaming/samples/ken.mp4", "ken");
 
 		// starting jetty server
 		Server server = new Server(8080);

@@ -89,6 +89,7 @@ public class NetServNode extends HttpServlet {
 		try {
 
 			String filename = cacheFile.getName();
+			
 			response.setHeader("Content-Disposition", "inline; filename="
 					+ filename);
 			response.setHeader("Cache-Control", "no-cache");
@@ -107,7 +108,7 @@ public class NetServNode extends HttpServlet {
 				Util.print("Serving the url stream & saving in local cache");
 				URL urlstream = new URL(url);
 				in = urlstream.openStream();
-				out_file = new FileOutputStream(cacheFile, true);
+				out_file = new FileOutputStream(cacheFile);
 			} else {
 				Util.print("Serving from local cache");
 				in = new FileInputStream(cacheFile);

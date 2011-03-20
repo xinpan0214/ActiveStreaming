@@ -105,9 +105,11 @@ public class ActiveStreamMap {
 			String host = videourl.getHost();
 			String path = videourl.getPath();
 			path = path.replaceAll("~", "");
-			String cache = LOCALROOT + "/" + host + path;
+			String cache = LOCALROOT + "/" + host +path;
 			Util.print("loading local file :" + cache);
-			return new File(cache);
+			File c = new File(cache);
+			c.getParentFile().mkdirs();
+			return c;
 		}
 
 		public int getCurrentFilePointer() {
