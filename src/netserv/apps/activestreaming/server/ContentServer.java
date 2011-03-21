@@ -24,6 +24,16 @@ public class ContentServer extends HttpServlet {
 	 * 
 	 */
 	private static final long serialVersionUID = 1L;
+	private static String SERVER_IP;
+	private static final int CONTENT_SERVER_PORT = 8080;
+
+	static {
+		try {
+			SERVER_IP = InetAddress.getLocalHost().getHostAddress();
+		} catch (UnknownHostException e) {
+			e.printStackTrace();
+		}
+	}
 
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
@@ -44,44 +54,92 @@ public class ContentServer extends HttpServlet {
 			}
 		}
 
-		String url = null;
-		if (mode != null && mode.equalsIgnoreCase("direct")) {
-			url = this.directURL(file);
+		System.out.println("Found file in the directory !");
+		// response.sendRedirect(url);
+		if (mode == null) {
+			sendVideoOptions(response, file);
 		} else {
-			url = this.netservNodeURL(file);
+			sendToNetServNode(file, response, mode);
 		}
 
-		//if (file != null && Streamer.Files.contains(file.trim())) {
-			// file is streaming
-			System.out.println("Found file in the directory !");
-			//response.sendRedirect(url);
-			sendHTML(url, file, response);
-		//} else {
-			// no file found
-			//System.out.println("file is not present !!");
-		//}
+		// } else {
+		// no file found
+		// System.out.println("file is not present !!");
+		// }
 	}
 
-	
-	public void sendHTML(String url, String file, HttpServletResponse response) {
+	public void sendVideoOptions(HttpServletResponse response, String file) {
+
+		try {
+			PrintWriter pr = response.getWriter();
+			pr.write("<html>");
+			pr.write("<head>");
+			pr.write("<title>NetServ - Active Streaming</title>");
+			pr.write("<style type=\"text/css\">");
+			pr.write("body { font: 14px/1.3 verdana, arial, helvetica, sans-serif }");
+			pr.write("h1 { font-size:1.3em }");
+			pr.write("h2 { font-size:1.2em }");
+			pr.write("a:link { color:#33c }");
+			pr.write("a:visited { color:#339 }");
+			pr.write("</style>");
+			pr.write("</head>");
+			pr.write("<body>");
+			pr.write("<h1>NetServ Active Streaming</h1>");
+			pr.write("<ul>");
+			pr.write("<li><a href=\"" + ContentServer.SERVER_IP + ":"
+					+ ContentServer.CONTENT_SERVER_PORT + "/stream/?file="
+					+ file + "&mode=live"
+					+ "\" target=\"ifrm\">Play Live Stream</a></li>");
+			pr.write("<li><a href=\"" + ContentServer.SERVER_IP + ":"
+					+ ContentServer.CONTENT_SERVER_PORT + "/stream/?file="
+					+ file + "&mode=vod"
+					+ "\" target=\"ifrm\">Play Video Recording</a></li>");
+			pr.write("<div id=\"container\" align=\"center\">");
+			pr.write("<iframe id=\"ifrm\" name=\"ifrm\" scrolling=\"auto\" width=\"80%\" height=\"480\"+"
+					+ " frameborder=\"1\">Your browser doesn't support iframes.</iframe>");
+			pr.write("</div>");
+			pr.write("</ul>");
+			pr.write("</body>");
+			pr.write("</html>");
+			pr.flush();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public String getHostIP() {
+		String host = null;
+		try {
+			host = InetAddress.getLocalHost().getHostAddress();
+		} catch (UnknownHostException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return host;
+	}
+
+	public void sendToNetServNode(String file, HttpServletResponse response,
+			String mode) {
+		String url = null;
+		if (mode != null && mode.equalsIgnoreCase("live")) {
+			url = this.netservNodeURL(file);
+		} else if (mode != null && mode.equalsIgnoreCase("vod")) {
+			url = this.netservNodeURL_VOD(file);
+		}
 		try {
 			PrintWriter pr = response.getWriter();
 			pr.write("<html>");
 			pr.write("<head><title>NetServ Active Streaming</title></head>");
 			pr.write("<body>");
-			pr.write("<h1>NetServ Active Streaming</h1>");
-
 			pr.write("<embed type=\"application/x-vlc-plugin\" name="
 					+ file
-					+ " autoplay=\"yes\" loop=\"no\" width=\"720\" height=\"480\" target=\""
+					+ " autoplay=\"yes\" loop=\"no\" width=\"680\" height=\"460\" target=\""
 					+ url + "\"" + " />");
 			pr.write("<br />");
-
 			pr.write("</body>");
 			pr.write("</html>");
 			pr.flush();
 		} catch (IOException e1) {
-			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
 	}
@@ -105,10 +163,17 @@ public class ContentServer extends HttpServlet {
 	public String netservNodeURL_VOD(String file) {
 		String netserv = "128.59.13.123:8888";
 		String newurl = "";
-		newurl = "http://" + netserv + "/stream-cdn/?url=" + directURL(file)+"&mode=vod";
+		newurl = "http://" + netserv + "/stream-cdn/?url=" + directURL(file)
+				+ "&mode=vod";
 		return newurl;
 	}
-	
+
+	/**
+	 * Gets the video stream server address
+	 * 
+	 * @param file
+	 * @return
+	 */
 	public String directURL(String file) {
 		String newurl = "";
 		try {
@@ -123,10 +188,11 @@ public class ContentServer extends HttpServlet {
 
 	public static void main(String[] args) throws Exception {
 		// starting streaming service
-		//Streamer.playMedia("/home/aman/workspace/ActiveStreaming/samples/smurfs.mp4", "smurfs");
+		// Streamer.playMedia("/home/aman/workspace/ActiveStreaming/samples/smurfs.mp4",
+		// "smurfs");
 
 		// starting jetty server
-		Server server = new Server(8080);
+		Server server = new Server(ContentServer.CONTENT_SERVER_PORT);
 		Context root = new Context(server, "/", Context.SESSIONS);
 		root.addServlet(new ServletHolder(new ContentServer()), "/stream/*");
 		System.out.println("Content Server started..");

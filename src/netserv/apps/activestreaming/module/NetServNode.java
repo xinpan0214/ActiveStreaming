@@ -159,6 +159,7 @@ public class NetServNode extends HttpServlet {
 	public void serveFromInputStream(File localFile,
 			HttpServletResponse response) {
 		try {
+			System.out.println("Serving from local file cache..");
 			FileInputStream in = new FileInputStream(localFile);
 			// Get the MIME type of the image
 			String mimeType = "video/mp4";
