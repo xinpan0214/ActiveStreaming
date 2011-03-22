@@ -1,6 +1,14 @@
 NetServ Active Streaming prototype:
 
+Origin Server controls the NetServ Node:
+Various commands:
+1. PREPARE - prepares the netserv node to start downloading the stream from the streaming server.
+2. LIVE - returns the live stream to the client.
+3. PASSIVE - returns the cached file from the local repository, file size increases dynamically.
+4. VOD - video is served as a static file from the local cache.
+5. STOP_DOWNLOAD - Origin server can send this command to stop the stream download
+
 TODO:
-1. Check the File Channel API for single writer multiple readers for a single file. This is essential for 'T' type of communication.
+1. Multiple client live stream, using circular buffer.
 2. The Streaming in VM is very slow, any other suggestions ?
  
