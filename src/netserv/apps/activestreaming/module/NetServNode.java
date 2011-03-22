@@ -1,18 +1,12 @@
 package netserv.apps.activestreaming.module;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.PrintWriter;
+
 import java.net.URL;
 
 import javax.servlet.http.HttpServlet;
@@ -63,10 +57,9 @@ public class NetServNode extends HttpServlet {
 						+ " from " + request.getRemoteAddr());
 				Thread writerThread = new Thread(new Runnable() {
 					public void run() {
-						OutputStream out_file = null;
+						FileOutputStream out_file = null;
 						CacheVideo cv = singleton.addURL(url);
 						File cacheFile = cv.getFileForURL(url);
-						// Copy the contents of the file to the output stream
 						byte[] buf = new byte[BUF_SIZE];
 						int count = 0;
 						Util.print("Contacting streaming server & saving locally.. ");
@@ -74,7 +67,6 @@ public class NetServNode extends HttpServlet {
 							URL urlstream = new URL(url);
 							cv.originInputStream = urlstream.openStream();
 							out_file = new FileOutputStream(cacheFile);
-
 							while ((count = cv.originInputStream.read(buf)) > 0) {
 								out_file.write(buf, 0, count);
 								cv.incrementTotalBytes(count);
@@ -132,15 +124,14 @@ public class NetServNode extends HttpServlet {
 		try {
 
 			String filename = cacheFile.getName();
-			res.setContentType("video/mp4");
+			//res.setContentType("video/mp4");
 			res.setHeader("Content-Disposition", "inline; filename=" + filename);
 			res.setHeader("Cache-Control", "no-cache");
 			res.setHeader("Expires", "-1");
 
-			// Copy the contents of the file to the output stream
 			byte[] buf = new byte[BUF_SIZE];
 			int count = 0;
-
+			Util.print("serving directly from origin stream");
 			while ((count = cv.originInputStream.read(buf)) > 0) {
 				res.getOutputStream().write(buf, 0, count);
 			}

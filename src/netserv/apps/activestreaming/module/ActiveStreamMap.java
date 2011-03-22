@@ -1,6 +1,8 @@
 package netserv.apps.activestreaming.module;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -76,11 +78,14 @@ public class ActiveStreamMap {
 		public static final int INITIAL = 1;
 		public static final int LIVE = 2;
 		public static final int VOD = 3;
+		private static final int BUF_SIZE = 1024;
 		public static final String LOCALROOT = "./cached-video";
 		public InputStream originInputStream;
 		public Set<HttpServletResponse> connectedClients = new HashSet<HttpServletResponse>();
-
 		public Thread writerThread;
+		public byte[] streamBuffer = new byte[BUF_SIZE];
+		public FileInputStream fin ;
+		
 		private URL videourl = null;
 		private int currentFilePointer = 0;
 		private int state;
@@ -94,6 +99,7 @@ public class ActiveStreamMap {
 		 */
 		private CacheVideo(String url) {
 			cacheFile = getFileForURL(url);
+			this.state = INITIAL;
 		}
 
 		/**
@@ -113,21 +119,6 @@ public class ActiveStreamMap {
 			path = path.replaceAll("~", "");
 			String cache = LOCALROOT + "/" + host +path;
 			File c = new File(cache);
-			this.state = INITIAL;
-			if(c.exists()){
-				long l1 = c.length();
-				try {
-					Thread.sleep(100);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-				long l2 = c.length();
-				if (l2 > l1) {
-					this.state = LIVE;
-				}else{
-					this.state = VOD;
-				}
-			}
 			c.getParentFile().mkdirs();
 			return c;
 		}

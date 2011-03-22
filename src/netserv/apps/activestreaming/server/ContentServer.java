@@ -25,16 +25,13 @@ public class ContentServer extends HttpServlet {
 	 */
 	private static final long serialVersionUID = 1L;
 	private static String SERVER_IP = "192.168.15.4";
-	private static final int CONTENT_SERVER_PORT = 8088;
+	private static final int SERVER_PORT = 8088;
+	private static final int NETSERV_PORT = 8888;
 
 	/*
-	static {
-		try {
-			SERVER_IP = InetAddress.getLocalHost().getHostAddress();
-		} catch (UnknownHostException e) {
-			e.printStackTrace();
-		}
-	}*/
+	 * static { try { SERVER_IP = InetAddress.getLocalHost().getHostAddress(); }
+	 * catch (UnknownHostException e) { e.printStackTrace(); } }
+	 */
 
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
@@ -55,7 +52,6 @@ public class ContentServer extends HttpServlet {
 			}
 		}
 
-		System.out.println("Found file in the directory !");
 		// response.sendRedirect(url);
 		if (mode == null) {
 			System.out.println("Sending video options response !");
@@ -90,12 +86,12 @@ public class ContentServer extends HttpServlet {
 			pr.write("<h1>NetServ Active Streaming</h1>");
 			pr.write("<ul>");
 			pr.write("<li><a href=\"http://" + ContentServer.SERVER_IP + ":"
-					+ ContentServer.CONTENT_SERVER_PORT + "/stream/?file="
+					+ ContentServer.SERVER_PORT + "/stream/?file="
 					+ file + "&mode=live"
 					+ "\" target=\"ifrm\">Play Live Stream</a></li>");
 			pr.write("<li><a href=\"http://" + ContentServer.SERVER_IP + ":"
-					+ ContentServer.CONTENT_SERVER_PORT + "/stream/?file="
-					+ file + "&mode=vod"
+					+ ContentServer.SERVER_PORT + "/stream/?file="
+					+ file + "&mode=passive"
 					+ "\" target=\"ifrm\">Play Video Recording</a></li>");
 			pr.write("<div id=\"container\" align=\"center\">");
 			pr.write("<iframe id=\"ifrm\" name=\"ifrm\" scrolling=\"auto\" width=\"80%\" height=\"480\"+"
@@ -134,8 +130,20 @@ public class ContentServer extends HttpServlet {
 			pr.write("<html>");
 			pr.write("<head><title>NetServ Active Streaming</title></head>");
 			pr.write("<body>");
-			pr.write("<video controls=\"controls\" " + "src =\"" + url + "\"" + " />");
+			pr.write("<embed type=\"application/x-vlc-plugin\" name="
+					+ file
+					+ " autoplay=\"yes\" loop=\"no\" width=\"680\" height=\"460\" target=\""
+					+ url + "\"" + " />");
+			// pr.write("<video controls=\"controls\" " + "src =\"" + url + "\""
+			// + " />");
 			pr.write("<br />");
+			/*
+			pr.write("<a href=\"javascript:;\" onclick=\'document." + file
+					+ ".play()\'>Play</a>");
+			pr.write("<a href=\"javascript:;\" onclick=\'document." + file
+					+ ".pause()\'>Pause</a>");
+			pr.write("<a href=\"javascript:;\" onclick=\'document." + file
+					+ ".play()\'>Stop</a>");*/
 			pr.write("</body>");
 			pr.write("</html>");
 			pr.flush();
@@ -154,17 +162,18 @@ public class ContentServer extends HttpServlet {
 	 * @param response
 	 */
 	public String netservNodeURL(String file) {
-		String netserv = "128.59.13.123:8888";
+		String netserv = SERVER_IP + ":" + NETSERV_PORT;
 		String newurl = "";
-		newurl = "http://" + netserv + "/stream-cdn/?url=" + directURL(file);
+		newurl = "http://" + netserv + "/stream-cdn/?url=" + directURL(file)
+				+ "&mode=live";
 		return newurl;
 	}
 
 	public String netservNodeURL_VOD(String file) {
-		String netserv = "128.59.13.123:8888";
+		String netserv = SERVER_IP + ":" + NETSERV_PORT;
 		String newurl = "";
 		newurl = "http://" + netserv + "/stream-cdn/?url=" + directURL(file)
-				+ "&mode=vod";
+				+ "&mode=passive";
 		return newurl;
 	}
 
@@ -177,12 +186,10 @@ public class ContentServer extends HttpServlet {
 	public String directURL(String file) {
 		String newurl = "";
 		/*
-		try {
-			newurl = "http://" + Streamer.streamServer + "/stream/"
-					+ URLEncoder.encode(file, "UTF-8");
-		} catch (UnsupportedEncodingException e) {
-			e.printStackTrace();
-		}*/
+		 * try { newurl = "http://" + Streamer.streamServer + "/stream/" +
+		 * URLEncoder.encode(file, "UTF-8"); } catch
+		 * (UnsupportedEncodingException e) { e.printStackTrace(); }
+		 */
 		newurl = "http://192.168.15.4:8080";
 		return newurl;
 	}
@@ -193,7 +200,7 @@ public class ContentServer extends HttpServlet {
 		// "smurfs");
 
 		// starting jetty server
-		Server server = new Server(ContentServer.CONTENT_SERVER_PORT);
+		Server server = new Server(ContentServer.SERVER_PORT);
 		Context root = new Context(server, "/", Context.SESSIONS);
 		root.addServlet(new ServletHolder(new ContentServer()), "/stream/*");
 		System.out.println("Content Server started..");
