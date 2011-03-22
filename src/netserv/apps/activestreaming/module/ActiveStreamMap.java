@@ -2,6 +2,7 @@ package netserv.apps.activestreaming.module;
 
 import java.io.File;
 import java.io.InputStream;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Collections;
 import java.util.HashMap;
@@ -79,6 +80,7 @@ public class ActiveStreamMap {
 		public InputStream originInputStream;
 		public Set<HttpServletResponse> connectedClients = new HashSet<HttpServletResponse>();
 
+		public Thread writerThread;
 		private URL videourl = null;
 		private int currentFilePointer = 0;
 		private int state;
@@ -91,14 +93,7 @@ public class ActiveStreamMap {
 		 * @param url
 		 */
 		private CacheVideo(String url) {
-			try {
-				videourl = new URL(url);
-			} catch (Exception e) {
-				Util.print("Problem casting URL - " + url);
-				Util.print(e.toString());
-			}
-			cacheFile = getFileForURL();
-			state = INITIAL;
+			cacheFile = getFileForURL(url);
 		}
 
 		/**
@@ -107,14 +102,32 @@ public class ActiveStreamMap {
 		 * 
 		 * @return
 		 */
-		public File getFileForURL() {
-
+		public File getFileForURL(String url) {
+			try {
+				videourl = new URL(url);
+			} catch (MalformedURLException e) {
+				e.printStackTrace();
+			}
 			String host = videourl.getHost();
 			String path = videourl.getPath();
 			path = path.replaceAll("~", "");
 			String cache = LOCALROOT + "/" + host +path;
-			Util.print("loading local file :" + cache);
 			File c = new File(cache);
+			this.state = INITIAL;
+			if(c.exists()){
+				long l1 = c.length();
+				try {
+					Thread.sleep(100);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				long l2 = c.length();
+				if (l2 > l1) {
+					this.state = LIVE;
+				}else{
+					this.state = VOD;
+				}
+			}
 			c.getParentFile().mkdirs();
 			return c;
 		}
