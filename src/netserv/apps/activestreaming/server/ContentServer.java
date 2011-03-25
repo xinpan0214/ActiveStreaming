@@ -2,18 +2,12 @@ package netserv.apps.activestreaming.server;
 
 import java.io.*;
 import java.net.*;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
-import java.util.Properties;
-import java.util.StringTokenizer;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
-import javax.servlet.ServletOutputStream;
 import javax.servlet.http.*;
+
+import netserv.apps.activestreaming.module.Util;
 
 import org.mortbay.jetty.*;
 import org.mortbay.jetty.servlet.*;
@@ -24,9 +18,10 @@ public class ContentServer extends HttpServlet {
 	 * 
 	 */
 	private static final long serialVersionUID = 1L;
-	private static String SERVER_IP = "192.168.15.4";
+	private static String SERVER_IP = "192.168.15.7";
 	private static final int SERVER_PORT = 8088;
 	private static final int NETSERV_PORT = 8888;
+	private static final int STREAM_SERVER_PORT = 8080;
 
 	/*
 	 * static { try { SERVER_IP = InetAddress.getLocalHost().getHostAddress(); }
@@ -40,19 +35,17 @@ public class ContentServer extends HttpServlet {
 	public void doGet(HttpServletRequest request, HttpServletResponse response) {
 		String file = request.getParameter("file");
 		String mode = request.getParameter("mode");
-		final String client = request.getRemoteAddr();
 
-		// For live Stream
+		Util.print("Request received for " + file + " from "
+				+ request.getRemoteAddr());
 		if (file == null) {
 			try {
-				response.getWriter().write("It Works !!");
+				response.getWriter().write("File not found !");
 			} catch (IOException e2) {
-				// TODO Auto-generated catch block
 				e2.printStackTrace();
 			}
 		}
 
-		// response.sendRedirect(url);
 		if (mode == null) {
 			System.out.println("Sending video options response !");
 			sendVideoOptions(response, file);
@@ -60,11 +53,6 @@ public class ContentServer extends HttpServlet {
 			System.out.println("Sending to NetServ Node !");
 			sendToNetServNode(file, response, mode);
 		}
-
-		// } else {
-		// no file found
-		// System.out.println("file is not present !!");
-		// }
 	}
 
 	public void sendVideoOptions(HttpServletResponse response, String file) {
@@ -86,13 +74,12 @@ public class ContentServer extends HttpServlet {
 			pr.write("<h1>NetServ Active Streaming</h1>");
 			pr.write("<ul>");
 			pr.write("<li><a href=\"http://" + ContentServer.SERVER_IP + ":"
-					+ ContentServer.SERVER_PORT + "/stream/?file="
-					+ file + "&mode=live"
-					+ "\" target=\"ifrm\">Play Live Stream</a></li>");
+					+ ContentServer.SERVER_PORT + "/stream/?file=" + file
+					+ "&mode=live" + "\" target=\"ifrm\">Play Live TV</a></li>");
 			pr.write("<li><a href=\"http://" + ContentServer.SERVER_IP + ":"
-					+ ContentServer.SERVER_PORT + "/stream/?file="
-					+ file + "&mode=passive"
-					+ "\" target=\"ifrm\">Play Video Recording</a></li>");
+					+ ContentServer.SERVER_PORT + "/stream/?file=" + file
+					+ "&mode=vod"
+					+ "\" target=\"ifrm\">Play Video on Demand</a></li>");
 			pr.write("<div id=\"container\" align=\"center\">");
 			pr.write("<iframe id=\"ifrm\" name=\"ifrm\" scrolling=\"auto\" width=\"80%\" height=\"480\"+"
 					+ " frameborder=\"1\">Your browser doesn't support iframes.</iframe>");
@@ -134,16 +121,7 @@ public class ContentServer extends HttpServlet {
 					+ file
 					+ " autoplay=\"yes\" loop=\"no\" width=\"680\" height=\"460\" target=\""
 					+ url + "\"" + " />");
-			// pr.write("<video controls=\"controls\" " + "src =\"" + url + "\""
-			// + " />");
 			pr.write("<br />");
-			/*
-			pr.write("<a href=\"javascript:;\" onclick=\'document." + file
-					+ ".play()\'>Play</a>");
-			pr.write("<a href=\"javascript:;\" onclick=\'document." + file
-					+ ".pause()\'>Pause</a>");
-			pr.write("<a href=\"javascript:;\" onclick=\'document." + file
-					+ ".play()\'>Stop</a>");*/
 			pr.write("</body>");
 			pr.write("</html>");
 			pr.flush();
@@ -173,7 +151,7 @@ public class ContentServer extends HttpServlet {
 		String netserv = SERVER_IP + ":" + NETSERV_PORT;
 		String newurl = "";
 		newurl = "http://" + netserv + "/stream-cdn/?url=" + directURL(file)
-				+ "&mode=passive";
+				+ "&mode=vod";
 		return newurl;
 	}
 
@@ -190,7 +168,7 @@ public class ContentServer extends HttpServlet {
 		 * URLEncoder.encode(file, "UTF-8"); } catch
 		 * (UnsupportedEncodingException e) { e.printStackTrace(); }
 		 */
-		newurl = "http://192.168.15.4:8080";
+		newurl = "http://" + SERVER_IP + ":" + STREAM_SERVER_PORT;
 		return newurl;
 	}
 

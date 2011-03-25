@@ -30,7 +30,7 @@ public class NetServNode extends HttpServlet {
 	}
 
 	/**
-	 * mode - 1. PREPARE 2. LIVE 3. PASSIVE 4. VOD 5. STOP_DOWNLOAD
+	 * mode - 1. PREPARE 2. LIVE 3. VOD 4. STOP_DOWNLOAD
 	 */
 	public void doGet(HttpServletRequest request, HttpServletResponse response) {
 		final String url = request.getParameter("url");
@@ -49,69 +49,42 @@ public class NetServNode extends HttpServlet {
 
 		CacheVideo cacheVideo = singleton.addURL(url);
 		File cacheFile = cacheVideo.getFileForURL(url);
+		Writer writer = new Writer(url);
 
 		try {
 			if (singleton.getState(url) == CacheVideo.INITIAL
 					&& mode.equalsIgnoreCase("prepare")) {
 				Util.print("Request received for preparing stream" + url
 						+ " from " + request.getRemoteAddr());
-				Thread writerThread = new Thread(new Runnable() {
-					public void run() {
-						FileOutputStream out_file = null;
-						CacheVideo cv = singleton.addURL(url);
-						File cacheFile = cv.getFileForURL(url);
-						byte[] buf = new byte[BUF_SIZE];
-						int count = 0;
-						Util.print("Contacting streaming server & saving locally.. ");
-						try {
-							URL urlstream = new URL(url);
-							cv.originInputStream = urlstream.openStream();
-							out_file = new FileOutputStream(cacheFile);
-							while ((count = cv.originInputStream.read(buf)) > 0) {
-								out_file.write(buf, 0, count);
-								cv.incrementTotalBytes(count);
-							}
-						} catch (IOException e) {
-							Util.print("Problem occured in writer Thread !!");
-							e.printStackTrace();
-						}
-					}
-				});
+				Thread writerThread = new Thread(writer);
 				writerThread.start();
-				cacheVideo.writerThread = writerThread;
 				cacheVideo.setState(CacheVideo.LIVE);
+				cacheVideo.writerInstance = writer;
 				response.getWriter().print(
-						"NetServ Node is downloading the stream now.. ");
+						"NetServ Node is downloading the stream now");
 				response.getWriter().close();
 			} else if ((singleton.getState(url) == CacheVideo.LIVE)
 					&& mode.equalsIgnoreCase("live")) {
-				// Live Broadcast is happening, add the client to list
-				Util.print("adding new client into the live broadcast list..");
+				Util.print("Adding new client into live broadcast list");
 				this.serveURL(url, cacheFile, response, false);
 			} else if (singleton.getState(url) == CacheVideo.LIVE
-					&& mode.equalsIgnoreCase("passive")) {
-				Util.print("Live streaming still happening.. but serving from local cache !"
+					&& mode.equalsIgnoreCase("vod")) {
+				Util.print("Live Streaming VOD service."
 						+ cacheFile.getName());
 				serveFromInputStream(cacheFile, response, false);
-			} else if (singleton.getState(url) == CacheVideo.VOD) {
-				// Live Broadcast has finished .. serve the recording
+			} else if (singleton.getState(url) == CacheVideo.LOCAL) {
 				Util.print("Video on Demand: sending from local cache"
 						+ cacheFile.getName());
 				serveFromInputStream(cacheFile, response, true);
+			}else if (mode.equalsIgnoreCase("stop")){
+				writer.stop_write();
+				
 			}
 		} catch (IOException e) {
 			Util.error("Cannot save and send :(");
 			e.printStackTrace();
 		}
 	}
-
-	/**
-	 * 
-	 * @param url
-	 * @param cacheFile
-	 * @param saveStream
-	 * @throws IOException
-	 */
 
 	public void serveURL(String url, File cacheFile, HttpServletResponse res,
 			boolean saveStream) throws IOException {
@@ -124,7 +97,6 @@ public class NetServNode extends HttpServlet {
 		try {
 
 			String filename = cacheFile.getName();
-			//res.setContentType("video/mp4");
 			res.setHeader("Content-Disposition", "inline; filename=" + filename);
 			res.setHeader("Cache-Control", "no-cache");
 			res.setHeader("Expires", "-1");
@@ -146,7 +118,7 @@ public class NetServNode extends HttpServlet {
 			if (out_file != null) {
 				out_file.close();
 				duration = System.currentTimeMillis() - start;
-				cv.setState(CacheVideo.VOD);
+				cv.setState(CacheVideo.LOCAL);
 			}
 		} catch (IOException e) {
 			Util.print("Error closing IO streams (" + e.toString() + ")");
@@ -157,29 +129,23 @@ public class NetServNode extends HttpServlet {
 
 	/**
 	 * Serves the stream from local repository
-	 * 
-	 * @param localFile
-	 * @param response
 	 */
 	public void serveFromInputStream(File localFile,
 			HttpServletResponse response, boolean vod) {
 		try {
 			System.out.println("Serving from local file cache..");
 			FileInputStream in = new FileInputStream(localFile);
-			// Get the MIME type of the image
 			String mimeType = "video/MP2T";
 
-			// Set content type
 			response.setContentType(mimeType);
 			response.setHeader("Content-Disposition", "inline; filename="
 					+ localFile.getName());
 			response.setHeader("Cache-Control", "no-cache");
 			response.setHeader("Expires", "-1");
-			// Set content size
+			
 			if (vod)
 				response.setContentLength((int) localFile.length());
 
-			// Open the file and output streams
 			OutputStream out = response.getOutputStream();
 
 			// Copy the contents of the file to the output stream
@@ -198,6 +164,42 @@ public class NetServNode extends HttpServlet {
 			out += e.toString();
 			out += ")";
 			Util.print(out);
+		}
+	}
+
+	protected class Writer implements Runnable {
+		boolean stopped;
+		String url;
+
+		private Writer(String url){
+			this.url = url;
+		}
+		public void run() {
+			FileOutputStream out_file = null;
+			CacheVideo cv = singleton.addURL(url);
+			File cacheFile = cv.getFileForURL(url);
+			byte[] buf = new byte[BUF_SIZE];
+			int count = 0;
+			Util.print("Contacting streaming server & saving locally.. ");
+			try {
+				URL urlstream = new URL(url);
+				cv.originInputStream = urlstream.openStream();
+				out_file = new FileOutputStream(cacheFile);
+				while ((count = cv.originInputStream.read(buf)) > 0) {
+					out_file.write(buf, 0, count);
+					cv.incrementTotalBytes(count);
+					if (stopped)
+						break;
+				}
+			} catch (IOException e) {
+				Util.print("Problem occured in writer Thread !!");
+				e.printStackTrace();
+			}
+		}
+
+		synchronized void stop_write() {
+			stopped = true;
+			notify();
 		}
 	}
 

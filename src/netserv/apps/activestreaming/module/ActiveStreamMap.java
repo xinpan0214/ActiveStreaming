@@ -1,25 +1,15 @@
 package netserv.apps.activestreaming.module;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
-import java.util.HashSet;
 
-import javax.servlet.http.HttpServletResponse;
+import netserv.apps.activestreaming.module.NetServNode.Writer;
 
-/**
- * TODO: Serialization of this object !
- * 
- * @author aman
- * 
- */
 public class ActiveStreamMap {
 
 	private Map<String, CacheVideo> urlMap;
@@ -77,26 +67,16 @@ public class ActiveStreamMap {
 		public static final int NOT_PRESENT = 0;
 		public static final int INITIAL = 1;
 		public static final int LIVE = 2;
-		public static final int VOD = 3;
-		private static final int BUF_SIZE = 1024;
+		public static final int LOCAL = 3;
 		public static final String LOCALROOT = "./cached-video";
 		public InputStream originInputStream;
-		public Set<HttpServletResponse> connectedClients = new HashSet<HttpServletResponse>();
-		public Thread writerThread;
-		public byte[] streamBuffer = new byte[BUF_SIZE];
-		public FileInputStream fin ;
+		public Writer writerInstance;
 		
 		private URL videourl = null;
-		private int currentFilePointer = 0;
 		private int state;
 		private File cacheFile;
 		private long totalByteSaved = 0;
 
-		/**
-		 * only the parent can instantiate this class
-		 * 
-		 * @param url
-		 */
 		private CacheVideo(String url) {
 			cacheFile = getFileForURL(url);
 			this.state = INITIAL;
@@ -105,8 +85,6 @@ public class ActiveStreamMap {
 		/**
 		 * Ideally we should check whether the url is streaming We assuming thee
 		 * stream is present
-		 * 
-		 * @return
 		 */
 		public File getFileForURL(String url) {
 			try {
@@ -121,14 +99,6 @@ public class ActiveStreamMap {
 			File c = new File(cache);
 			c.getParentFile().mkdirs();
 			return c;
-		}
-
-		public int getCurrentFilePointer() {
-			return currentFilePointer;
-		}
-
-		public void setCurrentFilePointer(int currentFilePointer) {
-			this.currentFilePointer = currentFilePointer;
 		}
 
 		public int getState() {
