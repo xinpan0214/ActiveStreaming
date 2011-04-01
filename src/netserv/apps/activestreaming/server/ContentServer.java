@@ -18,7 +18,7 @@ public class ContentServer extends HttpServlet {
 	 * 
 	 */
 	private static final long serialVersionUID = 1L;
-	private static String SERVER_IP = "192.168.15.7";
+	private static String SERVER_IP = "128.59.18.106";
 	private static final int SERVER_PORT = 8088;
 	private static final int NETSERV_PORT = 8888;
 	private static final int STREAM_SERVER_PORT = 8080;
