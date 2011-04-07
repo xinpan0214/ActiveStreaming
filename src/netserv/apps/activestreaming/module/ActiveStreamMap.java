@@ -18,11 +18,6 @@ public class ActiveStreamMap {
 		urlMap = Collections.synchronizedMap(new HashMap<String, CacheVideo>());
 	}
 
-	/**
-	 * SingletonHolder is loaded on the first execution of
-	 * Singleton.getInstance() or the first access to SingletonHolder.INSTANCE,
-	 * not before.
-	 */
 	private static class SingletonHolder {
 		public static final ActiveStreamMap INSTANCE = new ActiveStreamMap();
 	}
@@ -68,9 +63,13 @@ public class ActiveStreamMap {
 		public static final int INITIAL = 1;
 		public static final int LIVE = 2;
 		public static final int LOCAL = 3;
+		public static final int STORAGE_THRESHOLD = 0;
 		public static final String LOCALROOT = "./cached-video";
+		
 		public InputStream originInputStream;
 		public Writer writerInstance;
+		// total active connections for this video url
+		public int activeConn; 
 		
 		private URL videourl = null;
 		private int state;
@@ -125,7 +124,7 @@ public class ActiveStreamMap {
 			this.totalByteSaved = totalByteSaved;
 		}
 		public void incrementTotalBytes(long count){
-			this.totalByteSaved += this.totalByteSaved + count; 
+			this.totalByteSaved += count; 
 		}
 	}
 }
