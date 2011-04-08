@@ -41,6 +41,7 @@ public class NetServNode extends HttpServlet {
 	public void doGet(HttpServletRequest request, HttpServletResponse response) {
 		final String url = request.getParameter("url");
 		final String mode = request.getParameter("mode");
+		
 
 		if (url == null && mode == null) {
 			try {
@@ -54,6 +55,7 @@ public class NetServNode extends HttpServlet {
 		}
 
 		CacheVideo cacheVideo = singleton.addURL(url);
+		long total = cacheVideo.getTotalByteSaved();
 		File cacheFile = cacheVideo.getFileForURL(url);
 		try {
 			if (cacheVideo.activeConn < CacheVideo.STORAGE_THRESHOLD) {
@@ -85,14 +87,14 @@ public class NetServNode extends HttpServlet {
 					&& mode.equalsIgnoreCase("live")) {
 				Util.print("Going to live mode for.." + cacheFile.getName());
 				// serve from the local file
-				long total = cacheVideo.getTotalByteSaved();
-				serveFromInputStream(cacheFile, response, false, total);
+				//long total = cacheVideo.getTotalByteSaved();
+				serveFromInputStream(cacheVideo, cacheFile, response, false, total);
 			} else if (cacheVideo.activeConn > CacheVideo.STORAGE_THRESHOLD) {
 				Util.print("Serving from local cache.." + cacheFile.getName());
 				// increment the active connections
 				cacheVideo.activeConn += 1;
 				// serve from the local file
-				serveFromInputStream(cacheFile, response, false, 0);
+				serveFromInputStream(cacheVideo, cacheFile, response, false, 0);
 			} else if (mode.equalsIgnoreCase("stop")) {
 				cacheVideo.writerInstance.stop_write();
 			}
@@ -117,8 +119,9 @@ public class NetServNode extends HttpServlet {
 			Util.print("serving directly from origin stream..");
 			URL urlstream = new URL(url);
 			in = urlstream.openStream();
+			OutputStream out_stream = res.getOutputStream();
 			while ((count = in.read(buf)) > 0) {
-				res.getOutputStream().write(buf, 0, count);
+				out_stream.write(buf, 0, count);
 			}
 
 		} catch (org.mortbay.jetty.EofException e) {
@@ -138,10 +141,12 @@ public class NetServNode extends HttpServlet {
 	/**
 	 * Serves the stream from local repository
 	 */
-	public void serveFromInputStream(File localFile,
+	public void serveFromInputStream(CacheVideo cv, File localFile,
 			HttpServletResponse response, boolean vod, long skipBytes) {
 		try {
 			FileInputStream in = new FileInputStream(localFile);
+			FileChannel in_channel = in.getChannel();
+			
 			response.setHeader("Content-Disposition", "inline; filename="
 					+ localFile.getName());
 			response.setHeader("Cache-Control", "no-cache");
@@ -154,21 +159,51 @@ public class NetServNode extends HttpServlet {
 
 			// Copy the contents of the file to the output stream
 			byte[] buf = new byte[BUF_SIZE];
-			int count = 0;
+			byte[][] buffer = new byte[10][BUF_SIZE];
+			ByteBuffer buf_wrap = ByteBuffer.wrap(buf);
+			ByteBuffer[] buffer_wrap = new ByteBuffer[10];
+			for (int i = 0; i < 10; i++) {
+				buffer_wrap[i] = ByteBuffer.wrap(buffer[i]);
+			}
+			long count = 0;
+			int length = 0;
 			if (skipBytes > 0) {
 
-				in.skip(skipBytes - (long) 0.25 * skipBytes);
+				/*in.skip(skipBytes - (long) 0.5 * skipBytes);
+				 * 
+				 */
+				int bytesread = 0;
 				Util.print("Moving file current position to " + skipBytes
 						+ " bytes.");
-				while ((count = in.read(buf)) >= 0) {
-					out.write(buf, 0, count);
+				in_channel.position(skipBytes);
+				while(in_channel.position() - 3 * BUF_SIZE >= cv.getTotalByteSaved())
+					Thread.yield();
+
+				while (true) {
+					//System.out.println("reached here1");
+					//length = (int)( (cv.getTotalByteSaved() - in_channel.position()) / BUF_SIZE);
+					
+					count = in_channel.read(buf_wrap);
+					out.write(buf);
+					buf_wrap.clear();
+					/*bytesread = (int)count/BUF_SIZE + 1;
+					for (int i = 0; i < bytesread; i++) {
+						out.write(buffer[i], 0, (int)count);
+						buffer_wrap[i].clear();	
+					}
+					*/
 				}
 			} else {
-				while ((count = in.read(buf)) >= 0) {
-					out.write(buf, 0, count);
+				while ((count = in_channel.read(buf_wrap)) >= 0) {
+					//System.out.println("reached here");
+					out.write(buf, 0, (int)count);
+					buf_wrap.clear();
 				}
 			}
+			System.out.println("count is " + count);
+			System.out.println("reached here");
 
+			in_channel.close();
 			in.close();
 			out.flush();
 			out.close();
