@@ -1,6 +1,7 @@
 package netserv.apps.activestreaming.module;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.FileInputStream;
@@ -41,7 +42,6 @@ public class NetServNode extends HttpServlet {
 	public void doGet(HttpServletRequest request, HttpServletResponse response) {
 		final String url = request.getParameter("url");
 		final String mode = request.getParameter("mode");
-		
 
 		if (url == null && mode == null) {
 			try {
@@ -55,8 +55,8 @@ public class NetServNode extends HttpServlet {
 		}
 
 		CacheVideo cacheVideo = singleton.addURL(url);
-		long total = cacheVideo.getTotalByteSaved();
 		File cacheFile = cacheVideo.getFileForURL(url);
+		long total = cacheVideo.getTotalByteSaved();
 		try {
 			if (cacheVideo.activeConn < CacheVideo.STORAGE_THRESHOLD) {
 				Util.print("Request received for streaming " + url + " from "
@@ -77,6 +77,7 @@ public class NetServNode extends HttpServlet {
 				// start storing the into local cache
 				Writer writer = new Writer(url);
 				Thread writerThread = new Thread(writer);
+				writerThread.setPriority(Thread.MAX_PRIORITY);
 				writerThread.start();
 				cacheVideo.writerInstance = writer;
 
@@ -87,14 +88,17 @@ public class NetServNode extends HttpServlet {
 					&& mode.equalsIgnoreCase("live")) {
 				Util.print("Going to live mode for.." + cacheFile.getName());
 				// serve from the local file
-				//long total = cacheVideo.getTotalByteSaved();
-				serveFromInputStream(cacheVideo, cacheFile, response, false, total);
+				// if(cacheVideo.getState() == CacheVideo.LIVE){
+				// this.serveLiveStream(cacheVideo, response, total);
+				this.serveFromInputStream(cacheVideo, response, total);
+				// }
+
 			} else if (cacheVideo.activeConn > CacheVideo.STORAGE_THRESHOLD) {
 				Util.print("Serving from local cache.." + cacheFile.getName());
 				// increment the active connections
 				cacheVideo.activeConn += 1;
 				// serve from the local file
-				serveFromInputStream(cacheVideo, cacheFile, response, false, 0);
+				this.serveFromInputStream(cacheVideo, response, 0);
 			} else if (mode.equalsIgnoreCase("stop")) {
 				cacheVideo.writerInstance.stop_write();
 			}
@@ -102,6 +106,53 @@ public class NetServNode extends HttpServlet {
 			Util.error("Cannot save and send :(");
 			e.printStackTrace();
 		}
+	}
+
+	public void serveLiveStream(CacheVideo cv, HttpServletResponse response,
+			long skipBytes) {
+		response.setHeader("Content-Disposition", "inline; filename="
+				+ cv.getCacheFile().getName());
+		response.setHeader("Cache-Control", "no-cache");
+		response.setHeader("Expires", "-1");
+
+		/*
+		 * OutputStream out = null; // add output stream to live clients try {
+		 * out = response.getOutputStream();
+		 * Util.print("adding output stream to live clients " + out);
+		 * cv.liveClients.add(out); // yield for for the writer thread
+		 * Thread.yield(); // wait for writer thread to stop
+		 * cv.writerThread.join(); } catch (org.mortbay.jetty.EofException e) {
+		 * Util.error("Jetty.EOF : Browser connection closed !");
+		 * e.printStackTrace(); } catch (IOException e) { e.printStackTrace(); }
+		 * catch (InterruptedException e) { e.printStackTrace(); } finally { //
+		 * it may happen the browser connection is closed
+		 * Util.print("removing outputStream from live clients" + out);
+		 * cv.liveClients.remove(out); }
+		 */
+
+		try {
+			OutputStream out = response.getOutputStream();
+			FileInputStream in = new FileInputStream(cv.getCacheFile());
+			int count = 0;
+			if (skipBytes > 0) {
+				FileChannel inc = in.getChannel();
+				ByteBuffer b = ByteBuffer.allocate(BUF_SIZE);
+				long pos = skipBytes - 3 * BUF_SIZE;
+				if (pos > 0)
+					inc.position(pos);
+				Util.print("Moving file position to " + pos + " bytes.");
+				while (cv.getState() != CacheVideo.LOCAL) {
+					count = inc.read(b);
+					out.write(b.array());
+					b.clear();
+				}
+			}
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
 	}
 
 	public void serveURL(String url, File cacheFile, HttpServletResponse res)
@@ -119,9 +170,8 @@ public class NetServNode extends HttpServlet {
 			Util.print("serving directly from origin stream..");
 			URL urlstream = new URL(url);
 			in = urlstream.openStream();
-			OutputStream out_stream = res.getOutputStream();
 			while ((count = in.read(buf)) > 0) {
-				out_stream.write(buf, 0, count);
+				res.getOutputStream().write(buf, 0, count);
 			}
 
 		} catch (org.mortbay.jetty.EofException e) {
@@ -141,67 +191,46 @@ public class NetServNode extends HttpServlet {
 	/**
 	 * Serves the stream from local repository
 	 */
-	public void serveFromInputStream(CacheVideo cv, File localFile,
-			HttpServletResponse response, boolean vod, long skipBytes) {
+	public void serveFromInputStream(CacheVideo cv,
+			HttpServletResponse response, long skipBytes) {
 		try {
-			FileInputStream in = new FileInputStream(localFile);
+			FileInputStream in = new FileInputStream(cv.getCacheFile());
 			FileChannel in_channel = in.getChannel();
-			
+
 			response.setHeader("Content-Disposition", "inline; filename="
-					+ localFile.getName());
+					+ cv.getCacheFile().getName());
 			response.setHeader("Cache-Control", "no-cache");
 			response.setHeader("Expires", "-1");
-
-			if (vod)
-				response.setContentLength((int) localFile.length());
 
 			OutputStream out = response.getOutputStream();
 
 			// Copy the contents of the file to the output stream
 			byte[] buf = new byte[BUF_SIZE];
-			byte[][] buffer = new byte[10][BUF_SIZE];
 			ByteBuffer buf_wrap = ByteBuffer.wrap(buf);
-			ByteBuffer[] buffer_wrap = new ByteBuffer[10];
-			for (int i = 0; i < 10; i++) {
-				buffer_wrap[i] = ByteBuffer.wrap(buffer[i]);
-			}
-			long count = 0;
-			int length = 0;
-			if (skipBytes > 0) {
 
-				/*in.skip(skipBytes - (long) 0.5 * skipBytes);
-				 * 
-				 */
-				int bytesread = 0;
-				Util.print("Moving file current position to " + skipBytes
+			int count = 0;
+			if (skipBytes > 0) {
+				Util.print("Moving current position to " + skipBytes
 						+ " bytes.");
-				in_channel.position(skipBytes);
-				while(in_channel.position() - 3 * BUF_SIZE >= cv.getTotalByteSaved())
+				in_channel.position(skipBytes - 1000);
+				while (in_channel.position() - 3 * BUF_SIZE >= cv
+						.getTotalByteSaved())
 					Thread.yield();
 
-				while (true) {
-					//System.out.println("reached here1");
-					//length = (int)( (cv.getTotalByteSaved() - in_channel.position()) / BUF_SIZE);
-					
+				while (cv.getState() != CacheVideo.LOCAL) {
 					count = in_channel.read(buf_wrap);
-					out.write(buf);
-					buf_wrap.clear();
-					/*bytesread = (int)count/BUF_SIZE + 1;
-					for (int i = 0; i < bytesread; i++) {
-						out.write(buffer[i], 0, (int)count);
-						buffer_wrap[i].clear();	
+					if (count > 0) {
+						out.write(buf);
+						buf_wrap.clear();
 					}
-					*/
 				}
 			} else {
 				while ((count = in_channel.read(buf_wrap)) >= 0) {
-					//System.out.println("reached here");
-					out.write(buf, 0, (int)count);
+					out.write(buf, 0, count);
 					buf_wrap.clear();
 				}
 			}
 			System.out.println("count is " + count);
-			System.out.println("reached here");
 
 			in_channel.close();
 			in.close();
@@ -237,8 +266,11 @@ public class NetServNode extends HttpServlet {
 				cv.originInputStream = urlstream.openStream();
 				out_file = new FileOutputStream(cacheFile);
 				while ((count = cv.originInputStream.read(buf)) > 0) {
+					// write to the liveClients sequentially
+					// for (OutputStream out : cv.liveClients) {
+					// out.write(buf, 0, count);
+					// }
 					out_file.write(buf, 0, count);
-					out_file.flush();
 					cv.incrementTotalBytes(count);
 					if (stopped) {
 						cv.setState(CacheVideo.LOCAL);
