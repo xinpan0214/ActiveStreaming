@@ -169,9 +169,11 @@ public class NetServNode extends HttpServlet {
 				 */
 				Util.print("Moving file current position to " + skipBytes
 						+ " bytes.");
-				in_channel.position(skipBytes - 3 * BUF_SIZE);
-				while(in_channel.position() >= cv.getTotalByteSaved())
+				
+				in_channel.position(skipBytes - 5 * BUF_SIZE);
+				/*while(in_channel.position() >= cv.getTotalByteSaved())
 					Thread.yield();
+					*/
 
 				while (cv.getState() != CacheVideo.LOCAL) {
 					//System.out.println("reached here1");
